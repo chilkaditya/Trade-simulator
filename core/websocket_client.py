@@ -1,48 +1,66 @@
-# core/websocket_client.py
-
+import asyncio
+import websockets
 import json
 import time
-import websockets
-import asyncio
-from datetime import datetime
-
 from core.orderbook import OrderBook
-from core.trade_simulator import *
-from core.metrics import measure_latency
-from ui.display import display_output
+from core.trade_simulator import (
+    simulate_market_buy,
+    calculate_fee,
+    calculate_market_impact
+)
+from core.slippage_model import load_model, predict_slippage
+
+# WebSocket URL for OKX L2 data (BTC-USDT-SWAP for now)
+URL = "wss://ws.gomarket-cpp.goquant.io/ws/l2-orderbook/okx/BTC-USDT-SWAP"
 
 async def run():
-    url = "wss://ws.gomarket-cpp.goquant.io/ws/l2-orderbook/okx/BTC-USDT-SWAP"
     order_book = OrderBook()
+    model = load_model()
 
-    async with websockets.connect(url) as ws:
-        print("Connected to WebSocket.")
+    print("[*] Connecting to WebSocket stream...")
+    async with websockets.connect(URL) as ws:
+        print("[✓] Connected. Listening for data...\n")
+
         while True:
             try:
-                start = time.perf_counter()
                 message = await ws.recv()
+                start_time = time.perf_counter()
                 data = json.loads(message)
 
-                order_book.update(data["bids"], data["asks"])
+                # Update order book
+                asks = data.get("asks", [])
+                bids = data.get("bids", [])
+                order_book.update(asks, bids)
 
-                avg_price, qty, slippage, cost = simulate_market_buy(order_book, 100)
-                fee = calculate_fee(cost)
-                impact = estimate_market_impact(qty)
-                net_cost = calculate_net_cost(slippage, fee, impact, qty)
-                latency = measure_latency(start)
+                # Simulate market buy
+                usd_amount = 100
+                avg_price, qty, slippage = simulate_market_buy(order_book, usd_amount)
 
-                results = {
-                    "Avg Price": avg_price,
-                    "Expected": order_book.top_of_book()['best_ask'][0],
-                    "Slippage": slippage,
-                    "Qty": qty,
-                    "Fee ($)": fee,
-                    "Market Impact ($)": impact * qty,
-                    "Net Cost ($)": net_cost,
-                    "Latency (ms)": latency
-                }
+                if avg_price and qty:
+                    best_ask = order_book.top_of_book()['best_ask'][0]
+                    predicted_slippage = predict_slippage(model, usd_amount, best_ask)
 
-                display_output(results)
+                    fee = calculate_fee(avg_price, qty, fee_rate=0.001)
+                    impact = calculate_market_impact(order_size_usd=usd_amount)
+                    net_cost = slippage + fee + impact
+                    latency = (time.perf_counter() - start_time) * 1000
 
+                    print(f"""
+================ Tick ====================
+Best Ask:           {best_ask:.2f}
+Avg Fill Price:     {avg_price:.2f}
+Filled Qty:         {qty:.6f}
+
+Actual Slippage:    {slippage:.6f}
+Predicted Slippage: {predicted_slippage:.6f}
+
+Fee ($):            {fee:.6f}
+Market Impact ($):  {impact:.6f}
+Net Cost ($):       {net_cost:.6f}
+
+Internal Latency:   {latency:.2f} ms
+=========================================
+""")
             except Exception as e:
-                print("Error:", e)
+                print(f"[!] Error: {e}")
+                continue
