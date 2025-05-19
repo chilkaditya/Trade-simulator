@@ -182,8 +182,16 @@ Auto-refreshes on each tick.
 ```python
 Impact = gamma * OrderSize ** beta
 ```
- - η (eta): fixed impact coefficient (e.g., 0.00005)
- - OrderSize: USD value of market order
+beta (β):
+ - This is the exponent applied to volume. It determines how strongly the impact scales with trade volume.
+ - If beta = 1, impact increases linearly with volume.
+ - If beta < 1, the impact increases sublinearly (diminishing returns).
+ - If beta > 1, the impact increases superlinearly (more than proportionally).
+
+gamma (γ):
+ - This is a scaling factor or coefficient. It adjusts the magnitude of the impact, essentially stretching or compressing the curve defined by volume ** beta.
+
+OrderSize: USD value of market order
 
 **Why Simplified**?
 
