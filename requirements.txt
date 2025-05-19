@@ -1,5 +1,7 @@
-websockets
 asyncio
+websockets
 numpy
 pandas
-rich
+scikit-learn
+joblib
+streamlit
