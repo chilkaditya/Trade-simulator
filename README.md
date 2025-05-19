@@ -75,6 +75,8 @@ Implements a **simplified Almgren–Chriss model**:
 #### `calculate_latency(start_time, end_time)`
 Returns elapsed time in milliseconds for tick processing.
 
+---
+
 ### 📈 `slippage_model.py`
 
 Trains and predicts slippage using linear regression.
@@ -239,6 +241,8 @@ LinearRegression from sklearn
  - 0 = Maker (non-immediate / limit)
 
 **Note**: Currently, all simulated market orders are labeled takers. More real labeled data can improve future retraining.
+
+---
 
 ## ✅ Getting Started
 **Install dependencies**:
